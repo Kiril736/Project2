@@ -1,108 +1,93 @@
 import streamlit as st
 import numpy as np
 from PIL import Image
-import joblib
-import requests
-import io
+from sklearn.datasets import load_digits
+from sklearn.neural_network import MLPClassifier
+from sklearn.model_selection import train_test_split
 
 st.set_page_config(page_title="Handwritten Digit Recognition")
-st.tilte("Handwrittem Digit Recognition")
+st.title("Handwritten Digit Recognition")
 st.write("Upload a handwritten digit image and AI will try to recognize it.")
 
 @st.cache_resource
 def load_model():
-  try:
-    from sklearn.datasets import load_digits
-    from sklearn.nerual_network import MLPClassifier
-    from sklearn.model_selection import train_test_split
+    try:
+        digits = load_digits()
+        X = digits.images.reshape((len(digits.images), -1)) / 16.0
+        y = digits.target
 
-    digit = load_digit()
-    X = digits.images.reshape((len(digit.images), -1)) / 16.0
-    y = digits.target
-    X_train, _, y_train, _ = train_test_split(X, y, test_size=0.2, random_state=42)
+        X_train, _, y_train, _ = train_test_split(
+            X, y, test_size=0.2, random_state=42
+        )
 
-model = MLPClassifier(
-  hidden_layer_sizes=(100,),
-  max_tier=100
-  random_state=42
-  )
-model.fit(X_train, y_train)
-return model
-except Exception as e:
-    st.error(f"Model loading error: {e}")
-    return None
+        model = MLPClassifier(
+            hidden_layer_sizes=(100,),
+            max_iter=300,
+            random_state=42
+        )
+
+        model.fit(X_train, y_train)
+        return model
+
+    except Exception as e:
+        st.error(f"Model loading error: {e}")
+        return None
+
 
 model = load_model()
 
 if model is None:
-  st.warning("Coild not load model. Using fallbacl recognitiom.")
+    st.warning("Could not load model. Using fallback recognition.")
 else:
-  st.success("Model loaded successfully!")
+    st.success("Model loaded successfully!")
 
-upload_file = st.file_uploader("Choose an image file", type=["png", "jpg", "jpeg"])
+uploaded_file = st.file_uploader(
+    "Choose an image file", type=["png", "jpg", "jpeg"]
+)
 
 if uploaded_file is not None:
-  image = Image.open(uploaded_file)
-  st.image(image, caption='Upload Image', use_column_width=True)
+    try:
+        image = Image.open(uploaded_file)
+        st.image(image, caption="Uploaded Image", use_column_width=True)
 
+        # Preprocessing
+        img_gray = image.convert("L")
+        img_resized = img_gray.resize((8, 8))
+        img_array = np.array(img_resized)
 
-try:
-  img_gray = image.convert('L')
-  img_resized = img_gray.resize((8, 8))
+        # Invert if background is white
+        if np.mean(img_array) > 128:
+            img_array = 255 - img_array
 
-img_array = np.array(img_resized)
+        img_array = img_array / 16.0
+        img_flat = img_array.flatten().reshape(1, -1)
 
-if np.mean(img_array) > 128:
-  img_array = 255 - img_array
+        if model is not None:
+            prediction = model.predict(img_flat)[0]
+            st.write(f"## Prediction: **{prediction}**")
 
-img_array = img+array /16.0
-img_flat = img_array.flatten().reshape(1, -1)
+            probs = model.predict_proba(img_flat)[0]
+            st.write("### Probabilities:")
+            for i, prob in enumerate(probs):
+                st.write(f"Digit {i}: {prob:.2%}")
 
-if model is not None:
-  prediction = model.predict(img_flat)[0]
-  st.write(f"## Prediction: **{prediction}**")
+        else:
+            st.write("## Using fallback recognition")
+            digit_guess = np.argmax(np.sum(img_array, axis=0)) % 10
+            st.write(f"Estimated digit: **{digit_guess}**")
 
-probs = model.predict_proba(img_flat)[0]
-st.write("### Probabilities:")
-for i, prob in enumerate(probs):
-  st.write(f"Digit {i}: {prob:.2%}")
-else:
-  st.write(## Using fallback recognition")
-    st.write(f"Digit {i}: {prob:.2%}")
+    except Exception as e:
+        st.error(f"Error processing image: {e}")
 
-else:
-    # Fallback: simple threshold-based recognition
-    st.write("## Using fallback recognition")
-    # Simple heuristic based on pixel intensity
-    digit_guess = np.argmax(np.sum(img_array.reshape(8, 8), axis=0)) % 10
-    st.write(f"Estimated digit: **{digit_guess}**")
-
-except Exception as e:
-    st.error(f"Error processing image: {e}")
-
-# Instructions
+# Sidebar instructions
 st.sidebar.header("Instructions")
 st.sidebar.write("""
 1. Upload an image of a handwritten digit (0-9)
-2. The image will be resized to 8x8 pixels
-3. AI model will predict the digit
-4. For best results:
+2. Image is resized to 8x8 pixels
+3. AI model predicts the digit
+4. Best results:
    - White background
    - Black digit
    - Centered digit
    - Minimal noise
 """)
-
-  
-
-
-
-
-
-
-
-
-
-
-
-
